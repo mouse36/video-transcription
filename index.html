@@ -520,6 +520,23 @@
                 this.allVideos = [];
                 this.currentChannel = null;
                 this.isLoading = false;
+                this.validationTimeout = null;
+                
+                // List of valid YouTube channel tags for testing
+                this.validChannels = [
+                    'veritasium',
+                    'kurzgesagt',
+                    'techlead',
+                    'mkbhd',
+                    'codecademy',
+                    'freecodecamp',
+                    'pewdiepie',
+                    'mrbeast',
+                    'example',
+                    'testchannel',
+                    'demochannel',
+                    'sampleuser'
+                ];
                 
                 this.initializeEventListeners();
             }
@@ -549,8 +566,20 @@
                 
                 e.target.value = value;
                 
+                // Clear any existing timeout
+                if (this.validationTimeout) {
+                    clearTimeout(this.validationTimeout);
+                }
+                
+                // Clear status while typing
+                this.statusSection.innerHTML = '';
+                this.hideElements(['channelPreview', 'videoGrid', 'transcribeButton', 'progressSection', 'resultsSection']);
+                
+                // Set a new timeout to validate after user stops typing
                 if (value.trim() && !this.isLoading) {
-                    this.validateChannel(value.trim());
+                    this.validationTimeout = setTimeout(() => {
+                        this.validateChannel(value.trim());
+                    }, 500); // Wait 500ms after user stops typing
                 }
             }
             
@@ -563,8 +592,8 @@
                 setTimeout(() => {
                     this.isLoading = false;
                     
-                    // Mock validation - in real implementation, this would call YouTube API
-                    const isValid = channelTag.length > 0 && !channelTag.includes(' ') && channelTag !== 'invalid';
+                    // Check if channel tag is in our valid list
+                    const isValid = this.validChannels.includes(channelTag.toLowerCase());
                     
                     if (isValid) {
                         this.currentChannel = {
@@ -576,7 +605,7 @@
                         this.showChannelPreview();
                         this.generateMockVideos();
                     } else {
-                        this.showError('This is not a valid YouTube channel. Please check the URL and try again.');
+                        this.showError(`Channel '@${channelTag}' is not a valid YouTube channel. Please check if the tag is spelled correctly and try again.`);
                     }
                 }, 1000 + Math.random() * 1000);
             }
@@ -652,7 +681,7 @@
                 this.videoGrid.innerHTML = this.allVideos.map(video => `
                     <div class="video-item ${this.selectedVideos.has(video.id) ? 'selected' : ''}" 
                          data-video-id="${video.id}">
-                        <div class="video-thumbnail">
+                        <div class="video-thumbnail" data-video-id="${video.id}">
                             ${video.thumbnail}
                             <div class="selection-checkmark">✓</div>
                         </div>
@@ -661,11 +690,19 @@
                     </div>
                 `).join('');
                 
-                // Add click handlers for video selection
-                this.videoGrid.querySelectorAll('.video-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
+                // Add click handlers only for video thumbnails (not the entire item)
+                this.videoGrid.querySelectorAll('.video-thumbnail').forEach(thumbnail => {
+                    thumbnail.addEventListener('click', (e) => {
                         e.preventDefault();
-                        this.toggleVideoSelection(item.dataset.videoId);
+                        e.stopPropagation();
+                        this.toggleVideoSelection(thumbnail.dataset.videoId);
+                    });
+                });
+                
+                // Ensure video URLs open in new tab without affecting selection
+                this.videoGrid.querySelectorAll('.video-url').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent any parent click handlers
                     });
                 });
             }
